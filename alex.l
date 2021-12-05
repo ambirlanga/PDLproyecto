@@ -24,7 +24,7 @@ letra   [a-zA-Z]
 digito  [0-9]
 entero  {digito}+
 id    {letra}({digito}|{letra}|_)*
-comentario  \/\/.*\n
+comentario  \/\/.*
 
 /*-----------------------------------------------------------------------------
   Simbolos del lenguaje:
