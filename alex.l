@@ -18,7 +18,8 @@
 %option nounput       
 %option yylineno  
 
-delimitador [ \t\n]+
+delimitador [ \t]+
+saltoLinia  [\n]
 letra   [a-zA-Z]
 digito  [0-9]
 entero  {digito}+
@@ -31,6 +32,7 @@ comentario  \/\/.*\n
 -----------------------------------------------------------------------------*/
 %%
 {delimitador}  { if (verbosidad) ECHO;  }
+{saltoLinia}   { if (verbosidad) { ECHO; fprintf(stdout, "%3d.- ", yylineno); } }
 {comentario}   { if (verbosidad) ECHO;  }
 
 "while"        { retornar (WHILE_);     }
