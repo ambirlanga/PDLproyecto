@@ -12,14 +12,14 @@
 
 %%
 
-programa 	      	: listaDeclaraciones
+programa 	    : listaDeclaraciones
                     ;
 
 listaDeclaraciones	: declaracion
                     | listaDeclaraciones declaracion
                     ;
 			
-declaracion		    : declaracionVariable
+declaracion	    : declaracionVariable
                     | declaracionFuncion
                     ;
 			
@@ -28,18 +28,18 @@ declaracionVariable	: tipoSimple ID_ PUNTOYCOMA_
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
                     ;
 			
-tipoSimple		    : INT_
+tipoSimple	    : INT_
                     | BOOL_
                     ;
 
-listaCampos		    : tipoSimple ID_ PUNTOYCOMA_
+listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
                     | listaCampos tipoSimple ID_ PUNTOYCOMA_
                     ;
 
-declaracionFuncion	: tipoSimple ID_ APAR_ parametrosFormales CPAR_ bloque
+declaracionFuncion  : tipoSimple ID_ APAR_ parametrosFormales CPAR_ bloque
                     ;
 
-parametrosFormales	: 
+parametrosFormales  : 
                     | listaParametrosFormales
                     ;
 
