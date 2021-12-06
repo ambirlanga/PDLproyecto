@@ -71,10 +71,10 @@ comentario  \/\/.*
 ","            { retornar (COMA_);      }
 "."            { retornar (PUNTO_);     }
 
-{digito}+"."{digito}*   {retornar (CTE_);}
-{digito}*"."{digito}+   {retornar (CTE_);}
-{entero}       { retornar (CTE_);       }
-{id}           { retornar (ID_); }
+{digito}+"."{digito}*   { yylval.cent = atoi(yytext); retornar (CTE_); }
+{digito}*"."{digito}+   { yylval.cent = atoi(yytext); retornar (CTE_); }
+{entero}       { yylval.cent = atoi(yytext); retornar (CTE_); }
+{id}           { yylval.ident = strdup(yytext); retornar (ID_); }
 
 .	       { yyerror("Caracter desconocido"); }
 

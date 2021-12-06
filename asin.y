@@ -7,8 +7,16 @@
 #include "header.h"
 %}
 
+%union {
+	int cent;
+	char* ident;
+}
+
 %token WHILE_ IF_ ELSE_ READ_ PRINT_ RETURN_ BOOL_ INT_ MENOS_ DIV_ FALSE_ APAR_ ABRA_ ACOR_ PUNTOYCOMA_ ID_ STRUCT_ PUNTO_
 %token CTE_ OPAND_ OPOR_ OPE_ OPNE_ OPMAYOR_ OPMENOR_ OPMI_ OPMENI_ MAS_ POR_ TRUE_ CPAR_ CBRA_ CCOR_ IGUAL_ COMA_ OPDISTINTO_
+
+%token <cent> CTE_
+%token <ident> ID_
 
 %%
 
@@ -124,31 +132,31 @@ listaParametrosActuales: expresion
                     | expresion COMA_ listaParametrosActuales
                     ;
                     
-operadorLogico      : OPAND_
-                    | OPOR_
+operadorLogico      : OPAND_ { $$ = OP_AND; }
+                    | OPOR_ { $$ = OP_OR; }
                     ;
                     
-operadorIgualdad    : OPE_
-                    | OPNE_
+operadorIgualdad    : OPE_ { $$ = OP_IGUAL; }
+                    | OPNE_ { $$ = OP_NOIGUAL; }
                     ;
                     
-operadorRelacional  : OPMAYOR_
-                    | OPMENOR_
-                    | OPMI_
-                    | OPMENI_
+operadorRelacional  : OPMAYOR_ { $$ = OP_MAYOR; }
+                    | OPMENOR_ { $$ = OP_MENOR; }
+                    | OPMI_ { $$ = OP_MAYOROIG; }
+                    | OPMENI_ { $$ = OP_MENOROIG; }
                     ;
                     
-operadorAditivo     : MAS_
-                    | MENOS_
+operadorAditivo     : MAS_ { $$ = OP_SUMA; }
+                    | MENOS_ { $$ = OP_RESTA; }
                     ;
                     
-operadorMultiplicativo: POR_
-                    | DIV_
+operadorMultiplicativo: POR_ { $$ = OP_MULT; }
+                    | DIV_ { $$ = OP_DIV; }
                     ;
                     
-operadorUnario      : MAS_
-                    | MENOS_
-                    | OPDISTINTO_
+operadorUnario      : MAS_ { $$ = OP_SUMA; }
+                    | MENOS_ { $$ = OP_RESTA; }
+                    | OPDISTINTO_ { $$ = OP_NOT; }
                     ;
                     
 %%
