@@ -36,8 +36,8 @@ declaracionVariable	: tipoSimple ID_ PUNTOYCOMA_
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
                     ;
 			
-tipoSimple	    : INT_
-                    | BOOL_
+tipoSimple	    : INT_ { $$ = T_ENTERO; }
+                    | BOOL_ { $$ = T_LOGICO; }
                     ;
 
 listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
@@ -95,20 +95,70 @@ expresionIgualdad   : expresionRelacional
                     | expresionIgualdad operadorIgualdad expresionRelacional
                     ;
                     
-expresionRelacional : expresionAditiva
+expresionRelacional : expresionAditiva { $$.t = $1.t; }
                     | expresionRelacional operadorRelacional expresionAditiva
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");
+		    	    } else {
+		    	        $$.t = T_LOGICO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionAditiva    : expresionMultiplicativa
+expresionAditiva    : expresionMultiplicativa { $$.t = $1.t; }
                     | expresionAditiva operadorAditivo expresionMultiplicativa
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo");
+		    	    } else {
+		    	        $$.t = T_ENTERO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionMultiplicativa: expresionUnaria
+expresionMultiplicativa: expresionUnaria { $$.t = $1.t; }
                     | expresionMultiplicativa operadorMultiplicativo expresionUnaria
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    	    } else {
+		    	        $$.t = T_ENTERO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionUnaria     : expresionSufija
+expresionUnaria     : expresionSufija { $$.t = $1.t; }
                     | operadorUnario expresionUnaria
+		    {
+		    	$$.t = T_ERROR;
+		    	if ($2.t != T_ERROR) {
+		    	    if ($2.t == T_ENTERO) {
+		    		if ($1 == OP_NOT) {
+		    		    yyerror("Error con la incompatibilidad de tipos, no se puede negar un entero.");
+		    		} else {
+		    		    $$.t = T_ENTERO;
+		    		}
+		    	    } else if ($2.t == T_LOGICO) {
+		    		if ($1 == OP_SUMA || $1 == OP_RESTA) {
+		    		    yyerror("Error con la incompatibilidad de tipos, solo se puede aplicar el operador unario '+' o '-' a una expresión entera.");
+		    		} else {
+		    		    $$.t = T_LOGICO;
+		    		}
+		    	    } else {
+		    		yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    	    }
+		    	}
+		    }
                     ;
     
 expresionSufija     : constante
@@ -119,9 +169,9 @@ expresionSufija     : constante
                     | ID_ APAR_ parametrosActuales CPAR_
                     ;
                     
-constante           : CTE_ 
-                    | TRUE_
-                    | FALSE_
+constante           : CTE_ { $$.t = T_ENTERO; }
+                    | TRUE_ { $$.t = T_LOGICO; }
+                    | FALSE_ { $$.t = T_LOGICO; }
                     ;
                     
 parametrosActuales  :
