@@ -208,7 +208,7 @@ expresionUnaria     : expresionSufija { $$.t = $1.t; }
 		    		    $$.t = T_ENTERO;
 		    		}
 		    	    } else if ($2.t == T_LOGICO) {
-		    		if ($1 == OP_SUMA || $1 == OP_RESTA) {
+		    		if ($1 == OP_SUMAUN || $1 == OP_RESTAUN) {
 		    		    yyerror("Error con la incompatibilidad de tipos, solo se puede aplicar el operador unario '+' o '-' a una expresión entera.");
 		    		} else {
 		    		    $$.t = T_LOGICO;
@@ -264,8 +264,8 @@ operadorMultiplicativo: POR_ { $$ = OP_MULT; }
                     | DIV_ { $$ = OP_DIV; }
                     ;
                     
-operadorUnario      : MAS_ { $$ = OP_SUMA; }
-                    | MENOS_ { $$ = OP_RESTA; }
+operadorUnario      : MAS_ { $$ = OP_SUMAUN; }
+                    | MENOS_ { $$ = OP_RESTAUN; }
                     | OPDISTINTO_ { $$ = OP_NOT; }
                     ;
 %%
