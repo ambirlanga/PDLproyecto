@@ -30,18 +30,18 @@
 
 %%
 
-programa 	      	: listaDeclaraciones
+programa 	    : listaDeclaraciones
                     ;
     
-listaDeclaraciones	: declaracion
+listaDeclaraciones  : declaracion
                     | listaDeclaraciones declaracion
                     ;
 			
-declaracion		    : declaracionVariable
+declaracion	    : declaracionVariable
                     | declaracionFuncion
                     ;
 			
-declaracionVariable	: tipoSimple ID_ PUNTOYCOMA_
+declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
                     | tipoSimple ID_ ABRA_ CTE_ CBRA_ PUNTOYCOMA_
                         {int numelem = $4;
                          if($4 <= 0){
@@ -67,18 +67,18 @@ declaracionVariable	: tipoSimple ID_ PUNTOYCOMA_
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
                     ;
 			
-tipoSimple		    : INT_  {$$ = T_ENTERO;}
+tipoSimple	    : INT_  {$$ = T_ENTERO;}
                     | BOOL_ {$$ = T_LOGICO;}
                     ;
 
-listaCampos		    : tipoSimple ID_ PUNTOYCOMA_
+listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
                     | listaCampos tipoSimple ID_ PUNTOYCOMA_
                     ;
 
-declaracionFuncion	: tipoSimple ID_ APAR_ parametrosFormales CPAR_ bloque
+declaracionFuncion  : tipoSimple ID_ APAR_ parametrosFormales CPAR_ bloque
                     ;
 
-parametrosFormales	: 
+parametrosFormales  : 
                     | listaParametrosFormales
                     ;
 
@@ -92,6 +92,7 @@ bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ 
 declaracionVariableLocal: 
                     | declaracionVariableLocal declaracionVariable
                     ;
+
 listaInstrucciones  : 
                     | listaInstrucciones instruccion
                     ;
@@ -153,22 +154,72 @@ expresionIgualdad   : expresionRelacional {$$ = $1;}
                          else{$$ = T_ERROR; yyerror("Los tipos (igualdad) no coinciden");}}
                     ;
                     
-expresionRelacional : expresionAditiva {$$ = $1;}
-                    | expresionRelacional operadorRelacional expresionAditiva 
+expresionRelacional : expresionAditiva { $$.t = $1.t; }
+                    | expresionRelacional operadorRelacional expresionAditiva
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");
+		    	    } else {
+		    	        $$.t = T_LOGICO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionAditiva    : expresionMultiplicativa
+expresionAditiva    : expresionMultiplicativa { $$.t = $1.t; }
                     | expresionAditiva operadorAditivo expresionMultiplicativa
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo");
+		    	    } else {
+		    	        $$.t = T_ENTERO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionMultiplicativa: expresionUnaria
+expresionMultiplicativa: expresionUnaria { $$.t = $1.t; }
                     | expresionMultiplicativa operadorMultiplicativo expresionUnaria
+		    {
+		        $$.t = T_ERROR;
+		        if ($1.t != T_ERROR && $3.t != T_ERROR) {
+		    	    if (!($1.t == $3.t && $1.t == T_ENTERO)) {
+		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    	    } else {
+		    	        $$.t = T_ENTERO;
+		    	    }
+		        }
+		    }
                     ;
                     
-expresionUnaria     : expresionSufija
+expresionUnaria     : expresionSufija { $$.t = $1.t; }
                     | operadorUnario expresionUnaria
+		    {
+		    	$$.t = T_ERROR;
+		    	if ($2.t != T_ERROR) {
+		    	    if ($2.t == T_ENTERO) {
+		    		if ($1 == OP_NOT) {
+		    		    yyerror("Error con la incompatibilidad de tipos, no se puede negar un entero.");
+		    		} else {
+		    		    $$.t = T_ENTERO;
+		    		}
+		    	    } else if ($2.t == T_LOGICO) {
+		    		if ($1 == OP_SUMA || $1 == OP_RESTA) {
+		    		    yyerror("Error con la incompatibilidad de tipos, solo se puede aplicar el operador unario '+' o '-' a una expresión entera.");
+		    		} else {
+		    		    $$.t = T_LOGICO;
+		    		}
+		    	    } else {
+		    		yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    	    }
+		    	}
+		    }
                     ;
-    
+
 expresionSufija     : constante
                     | APAR_ expresion CPAR_
                     | ID_
@@ -190,32 +241,32 @@ listaParametrosActuales: expresion
                     | expresion COMA_ listaParametrosActuales
                     ;
                     
-operadorLogico      : OPAND_
-                    | OPOR_
+                    
+operadorLogico      : OPAND_ { $$ = OP_AND; }
+                    | OPOR_ { $$ = OP_OR; }
                     ;
                     
-operadorIgualdad    : OPE_
-                    | OPNE_
+operadorIgualdad    : OPE_ { $$ = OP_IGUAL; }
+                    | OPNE_ { $$ = OP_NOIGUAL; }
+                    ;
+
+operadorRelacional  : OPMAYOR_ { $$ = OP_MAYOR; }
+                    | OPMENOR_ { $$ = OP_MENOR; }
+                    | OPMI_ { $$ = OP_MAYOROIG; }
+                    | OPMENI_ { $$ = OP_MENOROIG; }
                     ;
                     
-operadorRelacional  : OPMAYOR_
-                    | OPMENOR_
-                    | OPMI_
-                    | OPMENI_
+operadorAditivo     : MAS_ { $$ = OP_SUMA; }
+                    | MENOS_ { $$ = OP_RESTA; }
+                    ;
+
+operadorMultiplicativo: POR_ { $$ = OP_MULT; }
+                    | DIV_ { $$ = OP_DIV; }
                     ;
                     
-operadorAditivo     : MAS_
-                    | MENOS_
+operadorUnario      : MAS_ { $$ = OP_SUMA; }
+                    | MENOS_ { $$ = OP_RESTA; }
+                    | OPDISTINTO_ { $$ = OP_NOT; }
                     ;
-                    
-operadorMultiplicativo: POR_
-                    | DIV_
-                    ;
-                    
-operadorUnario      : MAS_
-                    | MENOS_
-                    | OPDISTINTO_
-                    ;
-                    
 %%
 
