@@ -82,6 +82,11 @@ declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
                          else dvar += numelem * TALLA_TIPO_SIMPLE;
                          }
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
+		    	{
+                         if( !insTdS($5, VARIABLE, T_RECORD, niv, dvar, -1)){yyerror("Identificador repetido");}
+                         else{
+                         }
+                        }
                     ;
 			
 tipoSimple	    : INT_  {$$ = T_ENTERO;}
@@ -274,6 +279,15 @@ expresionSufija     : constante { $$.t = $1.t; }
             }
                     | ID_ PUNTO_ ID_
                     | ID_ ABRA_ expresion CBRA_
+		    	{       
+                            $$ = T_ERROR;
+                            SIMB sim = obtenerTDS($1);         
+                            if (sim.t != T_ERROR) {yyerror("Variable no declarada")}
+                            else if (sim.t != T_ARRAY) {yyerror("Se esperaba un tipo vector")}
+                            else{
+                                if ($3 != T_ENTERO) {yyerror("VECTOR: La variable con la que se accede ha de ser un entero");}                             
+                            }                              
+                        }
                     | ID_ APAR_ parametrosActuales CPAR_
                     ;
                     
