@@ -6,17 +6,23 @@
 #ifndef _HEADER_H
 #define _HEADER_H
 
+typedef struct lis /**************** Estructura para listaParametrosFormales */
+{              
+  int talla;        
+  int ref;         
+}ListaP;
+
+
+/***************************************************** Constantes Simbolicas */
+#define TALLA_TIPO_SIMPLE 1 /* Talla asociada a los tipos simples */
+#define TALLA_SEGENLACES 2 /* Talla del segmento de Enlaces de Control */
+
+
 /****************************************************** Constantes generales */
 #define TRUE  1
 #define FALSE 0
 
 /**************************************************************** Operadores */
-// Assignació
-#define asignació
-#define asignació suma
-#define asignació resta
-#define asignació multiplicació
-#define asignació divisió
 // Lògic
 #define OP_AND 0
 #define OP_OR 1
@@ -52,6 +58,14 @@ extern void yyerror(const char * msg) ;   /* Tratamiento de errores          */
 
 extern int verbosidad;                   /* Flag si se desea una traza       */
 extern int numErrores;              /* Contador del numero de errores        */
+
+
+/************************ Variables externas definidas en Programa Principal */
+extern int verTdS; /* Flag para saber si mostrar la TdS */
+/**************************** Variables externas definidas en las librer´ıas */
+extern int dvar; /* Desplazamiento en el Segmento de Variables */
+extern int niv; /* Nivel de anidamiento "global" o "local" */
+
 
 #endif  /* _HEADER_H */
 /*****************************************************************************/
