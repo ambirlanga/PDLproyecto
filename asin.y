@@ -5,12 +5,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "header.h"
+#include "libtds.h"
 %}
 
 %union{
     int     cent;
     char*   ident;
-    int     tipo;
+    Listap  lis;
 }
 //Todos los simbolos terminales que no necesiten atributos van con token y ya.
 
@@ -24,24 +25,40 @@
 %token<cent> CTE_
 %token<ident> ID_
 
+
+
 //No terminales con atributos se definen con %type<x>
 
+%type<cent> declaracionVariable  declaracion declaracionFuncion listaDeclaraciones tipoSimple instruccionAsignacion
+%type<cent> expresion expresionIgualdad expresionRelacional expresionAditiva expresionMultiplicativa expresionUnaria expresionSufija 
+%type<cent> constante operadorLogico operadorIgualdad operadorRelacional operadorAditivo operadorMultiplicativo operadorUnario
+%type<cent> parametrosFormales parametrosActuales listaParametrosActuales listaCampos
+%type<lis> listaParametrosFormales
 
 
 %%
 
-programa 	    : listaDeclaraciones
+programa 	    : {dvar=0; niv = 0; cargaContexto(niv);} listaDeclaraciones
+        {
+            if(verTdS) mostrarTdS();
+        }
                     ;
     
-listaDeclaraciones  : declaracion
-                    | listaDeclaraciones declaracion
+listaDeclaraciones  : declaracion {$$ = $1;}
+                    | listaDeclaraciones declaracion {$$ = $1 + $2;} 
                     ;
 			
-declaracion	    : declaracionVariable
-                    | declaracionFuncion
+declaracion	    : declaracionVariable {$$ = 0;} 
+                    | declaracionFuncion {$$ = $1;}
                     ;
 			
 declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
+            {
+                if(! insTdS($2, VARIABLE, $1, niv, dvar, -1))
+                    yyerror("Variable con identificador ya existente");
+                else 
+                    dvar += TALLA_TIPO_SIMPLE;
+            }
                     | tipoSimple ID_ ABRA_ CTE_ CBRA_ PUNTOYCOMA_
                         {int numelem = $4;
                          if($4 <= 0){
@@ -78,15 +95,31 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
 declaracionFuncion  : tipoSimple ID_ APAR_ parametrosFormales CPAR_ bloque
                     ;
 
-parametrosFormales  : 
-                    | listaParametrosFormales
+parametrosFormales  : {$$ = insTdD(-1, T_VACIO);}
+                    | listaParametrosFormales {$$ = $1.ref;}
                     ;
 
 listaParametrosFormales: tipoSimple ID_
-                       | tipoSimple ID_ COMA_ listaParametrosFormales
-                       ;
+        {   
+            $$.ref = insTdD(-1, $1);
+            $$.talla = TALLA_TIPO_SIMPLE + TALLA_SEGENLACES;
+            if(!insTdS($2, PARAMETRO, $1, niv, -talla, -1))
+                yyerror("Parametro con identificador ya existente");
+        }
+                    | tipoSimple ID_ COMA_ listaParametrosFormales
+        {   
+            $$.ref = insTdD($4.ref, $1);
+            $$.talla = TALLA_TIPO_SIMPLE + TALLA_SEGENLACES;
+            if(!insTdS($2, PARAMETRO, $1, niv, -talla, -1))
+                yyerror("Parametro con identificador ya existente");
+        }
+                    ;
 			
 bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_ CCOR_
+        {
+          INF inf = obtTdD(-1);
+          if (inf.t != T_ERROR && inf.t != $5){ yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.")}
+        }
                     ;
 
 declaracionVariableLocal: 
@@ -109,19 +142,19 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                          if(sim.t == T_ERROR)yerror("Objeto no declarado");
                          else if (!(sim.t == $3.t == T_ENTERO || sim.t == $3.t == T_LOGICO))
                             yyerror("Error de tipos en la instrucción de asignación’");
-                         }
+                        }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
                         {SIMB sim = obtTdS($1);
                          if(sim.t == T_ERROR){yerror("Objeto no declarado");}
                          else{
                             if($6 != T_ERROR){
-                                if(sim.tipo == T_ARRAY){yyerror("ID no es de un array");}
+                                if(sim.t == T_ARRAY){yyerror("ID no es de un array");}
                                 else{
                                     DIM dim = obtTdA(sim.ref);
                                     if(!(dim.telem == $6)){ yyerror("Error de tipos, no coincide tipo de array con expresion");}                                    
                                     else{
                                         if($3 != T_ENTERO){yyerror("Indice debe ser de tipo entero");}
-                                        else{ $$ = sim.tipo; }
+                                        else{ $$ = sim.t; }
                                     }
                                 }
                             }
@@ -141,16 +174,26 @@ instruccionSeleccion: IF_ APAR_ expresion CPAR_ instruccion ELSE_ instruccion
                     ;
                 
 instruccionIteracion: WHILE_ APAR_ expresion CPAR_ instruccion
-                        {if($3 != T_ENTERO) {$$ = T_ERROR; yyerror("WHILE: Se esperaba una expresion logica");}}
+                        {if($3 != T_LOGICO) {$$ = T_ERROR; yyerror("WHILE: Se esperaba una expresion logica");}}
                     ;
 
 expresion           : expresionIgualdad {$$ = $1}
                     | expresion operadorLogico expresionIgualdad
+            {
+                $$.t = T_ERROR;
+                if ($1.t != T_ERROR || $3.t != T_ERROR) {
+                    if ($1.t == $3.t && $1.t != T_LOGICO) {
+                        $$.t = T_LOGICO;
+                    } else {
+                        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o son booleanos.");;
+                    }
+                }
+            }
                     ;
                     
 expresionIgualdad   : expresionRelacional {$$ = $1;}
                     | expresionIgualdad operadorIgualdad expresionRelacional
-                        {if ($1 == $3 == T_ENTERO) {$$ = T_LOGICO;}
+                        {if ($1 == $3 == T_ENTERO || $1 == $3 == T_LOGICO) {$$ = T_LOGICO;}
                          else{$$ = T_ERROR; yyerror("Los tipos (igualdad) no coinciden");}}
                     ;
                     
@@ -220,9 +263,15 @@ expresionUnaria     : expresionSufija { $$.t = $1.t; }
 		    }
                     ;
 
-expresionSufija     : constante
-                    | APAR_ expresion CPAR_
+expresionSufija     : constante { $$.t = $1.t; }
+                    | APAR_ expresion CPAR_ { $$.t = $2.t; }
                     | ID_
+            {   
+                $$ = T_ERROR;
+                SIMB sim = obtTdS($1);
+                if (sim.t != T_ERROR) {$$.t = sim.t;}   
+                else {yyerror("Variable mal declarada"); }
+            }
                     | ID_ PUNTO_ ID_
                     | ID_ ABRA_ expresion CBRA_
                     | ID_ APAR_ parametrosActuales CPAR_
@@ -233,12 +282,12 @@ constante           : CTE_   {$$ = T_ENTERO;}
                     | FALSE_ {$$ = T_LOGICO;}
                     ;
                     
-parametrosActuales  :
-                    | listaParametrosActuales
+parametrosActuales  : {$$ = insTdD(-1, T_VACIO);}
+                    | listaParametrosActuales {$$ = $1;}
                     ;
                     
-listaParametrosActuales: expresion
-                    | expresion COMA_ listaParametrosActuales
+listaParametrosActuales: expresion {$$ = insTdD(-1,$1);}
+                    | expresion COMA_ listaParametrosActuales {$$ = insTdD($3,$1);}
                     ;
                     
                     
@@ -269,4 +318,3 @@ operadorUnario      : MAS_ { $$ = OP_SUMAUN; }
                     | OPDISTINTO_ { $$ = OP_NOT; }
                     ;
 %%
-
