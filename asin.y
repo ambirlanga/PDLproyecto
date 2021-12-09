@@ -119,6 +119,7 @@ declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametr
                     }
                     if(strcmp($2, "main\0")==0) $$=-1; else $$=0;
                     if(verTdS) mostrarTdS(); descargaContexto(niv);
+                    niv=0; dvar=$<cent>2;
                     }
                     ;
 
