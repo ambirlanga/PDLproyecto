@@ -13,21 +13,22 @@
     char*   ident;
     ListaP  lis;
 }
-//Todos los simbolos terminales que no necesiten atributos van con token y ya.
+
+//Todos los simbolos terminales que no necesiten atributos
 
 %token WHILE_ IF_ ELSE_ READ_ PRINT_ RETURN_ BOOL_ INT_ MENOS_ DIV_ FALSE_ APAR_ ABRA_ ACOR_ PUNTOYCOMA_ STRUCT_ PUNTO_
 
 %token OPAND_ OPOR_ OPE_ OPNE_ OPMAYOR_ OPMENOR_ OPMI_ OPMENI_ MAS_ POR_ TRUE_ CPAR_ CBRA_ CCOR_ IGUAL_ COMA_ OPDISTINTO_
 
 
-//Solamente los que tienen atributos se definen con ellos.
+//Simbolos terminales con atributos
 
 %token<cent> CTE_
 %token<ident> ID_
 
 
 
-//No terminales con atributos se definen con %type<x>
+//No terminales con atributos 
 
 %type<cent> declaracionVariable  declaracion declaracionFuncion listaDeclaraciones tipoSimple instruccionAsignacion
 %type<cent> expresion expresionIgualdad expresionRelacional expresionAditiva expresionMultiplicativa expresionUnaria expresionSufija 
@@ -102,16 +103,19 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
                     ;
 
 declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
-                    {if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
+                    {$<cent>$=0;
+                        if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
                         yyerror("Identificador de funcion repetido");
-                        if(strcmp($2, "main\0")==0){yyerror("El programa tiene mas de un main");}
+                        if(strcmp($2, "main\0")==0){$<cent>$=1;}
                         }}   
                     bloque 
                     { 
+                    if($<cent>7 ==1) {yyerror("El programa tiene mas de un main");}
                     if(strcmp($2, "main\0")==0) $$=-1; 
                     else $$=0;
 
-                    if(verTdS) mostrarTdS(); descargaContexto(niv);
+                    if(verTdS) mostrarTdS(); 
+                    descargaContexto(niv);
                     niv=0;
                     }
                     ;
