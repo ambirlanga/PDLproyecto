@@ -43,7 +43,7 @@
 %%
 
 programa 	    : {dvar=0; niv = 0; cargaContexto(niv);} listaDeclaraciones
-            {if($2 == 0){yyerror("el programa no tiene main");}}
+            {if($2 == 0){yyerror("el programa no tiene main");} fprintf(stdout,"\n");}
                     ;
     
 listaDeclaraciones  : declaracion {$$ = $1;}

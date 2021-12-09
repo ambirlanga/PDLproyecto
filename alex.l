@@ -31,8 +31,8 @@ comentario  \/\/.*
     (id,cte,struct,int,bool,return,print,read,if,while,else)
 -----------------------------------------------------------------------------*/
 %%
-{delimitador}  { if (verbosidad) ECHO;  }
 {saltoLinia}   { if (verbosidad) { ECHO; fprintf(stdout, "%3d.- ", yylineno); } }
+{delimitador}  { if (verbosidad) ECHO;  }
 {comentario}   { if (verbosidad) ECHO;  }
 
 "while"        { retornar (WHILE_);     }
