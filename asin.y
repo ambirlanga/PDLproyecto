@@ -148,7 +148,7 @@ listaParametrosFormales: tipoSimple ID_
 bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_ CCOR_
         {
           INF inf = obtTdD(-1);
-          if (inf.tipo != T_ERROR && inf.tipo != $5){ yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");}
+          if (inf.tipo != T_ERROR || inf.tipo != $5){ yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");}
         }
                     ;
 
