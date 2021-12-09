@@ -57,7 +57,7 @@ declaracion	    : declaracionVariable {$$ = 0;}
 declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
             {
                 if(! insTdS($2, VARIABLE, $1, niv, dvar, -1))
-                    yyerror("Identificador variable repetido");
+                    yyerror("Identificador repetido");
                 else 
                     dvar += TALLA_TIPO_SIMPLE;
             }
@@ -85,7 +85,9 @@ declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
                          }
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
 		    	        {
-                         if( !insTdS($5, VARIABLE, T_RECORD, niv, dvar, -1)){yyerror("Identificador repetido");}
+                         int refe = insTdR($3.ref, $5, T_RECORD, $3.talla);
+                         if(refe==-1){yyerror("Nombre de struct invalido");}
+                         else if( !insTdS($5, VARIABLE, T_RECORD, niv, dvar, refe)){yyerror("Identificador repetido");}
                          else
                             dvar += TALLA_TIPO_SIMPLE;
                         }
@@ -170,7 +172,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                         if ($3 != T_ERROR){
                          if(sim.t == T_ERROR) {yyerror("Objeto no declarado");}
                          else if (!(sim.t == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)))
-                            yyerror("Error de tipos en la instrucción de asignación");
+                            yyerror("El identificador debe ser de tipo simple");
                         }
                         }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
@@ -182,7 +184,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                             else if($3 != T_ENTERO){yyerror("Indice debe ser de tipo entero");}
                             else{
                                     DIM dim = obtTdA(sim.ref);
-                                    if(!(dim.telem == $6)){ yyerror("Error de tipos en la instrucción de asignación");} 
+                                    if(!(dim.telem == $6)){ yyerror("El identificador debe ser de tipo simple");} 
                             }
                         }
                         }
@@ -194,7 +196,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                                 CAMP reg = obtTdR(sim.ref, $3);
                                 if (reg.t == T_ERROR) {yyerror("Campo no declarado");}   
                                 else if (!(reg.t == $5 && ($5 == T_ENTERO || $5 == T_LOGICO)))
-                                    yyerror("Error de tipos en la instrucción de asignación");
+                                    yyerror("El identificador debe ser de tipo simple");
                             }
                         }      
                         }
@@ -203,18 +205,18 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
 instruccionEntradaSalida: READ_ APAR_ ID_ CPAR_ PUNTOYCOMA_
                         {
                             SIMB sim = obtTdS($3);
-                            if(sim.t != T_ENTERO) {$$ = T_ERROR; yyerror("WRITE: El identificador no es un entero");}
+                            if(sim.t != T_ENTERO) {$$ = T_ERROR; yyerror("El argumento del read debe ser entero");}
                         }
                     | PRINT_ APAR_ expresion CPAR_ PUNTOYCOMA_
-                        {if($3 != T_ENTERO) {$$ = T_ERROR; yyerror("PRINT: La expresion no es un entero");}}
+                        {if($3 != T_ENTERO) {$$ = T_ERROR; yyerror("La expresion del print debe ser entera");}}
                     ;
 
 instruccionSeleccion: IF_ APAR_ expresion CPAR_ instruccion ELSE_ instruccion
-                        {if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("IF: Se esperaba una expresion logica");}}
+                        {if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("El argumento del if debe ser logica");}}
                     ;
                 
 instruccionIteracion: WHILE_ APAR_ expresion CPAR_ instruccion 
-{if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("WHILE: Se esperaba una expresion logica");}}
+{if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("La expresion del while debe ser logica");}}
                     ;
 
 expresion           : expresionIgualdad {$$ = $1;}
@@ -225,7 +227,7 @@ expresion           : expresionIgualdad {$$ = $1;}
                     if ($1 == $3 && $1 != T_LOGICO) {
                         $$ = T_LOGICO;
                     } else {
-                        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o son booleanos.");;
+                        yyerror("Error con la incompatibilidad de tipos (logica).");
                     }
                 }
             }
@@ -234,7 +236,7 @@ expresion           : expresionIgualdad {$$ = $1;}
 expresionIgualdad   : expresionRelacional {$$ = $1;}
                     | expresionIgualdad operadorIgualdad expresionRelacional
                         {if ($1 == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)) {$$ = T_LOGICO;}
-                         else{$$ = T_ERROR; yyerror("Los tipos (igualdad) no coinciden");}}
+                         else{$$ = T_ERROR; yyerror("Error con la incompatibilidad de tipos (igualdad).");}}
                     ;
                     
 expresionRelacional : expresionAditiva { $$ = $1;}
@@ -243,7 +245,7 @@ expresionRelacional : expresionAditiva { $$ = $1;}
 		        $$ = T_ERROR;
 		        if ($1 != T_ERROR && $3 != T_ERROR) {
 		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
-		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");
+		    	        yyerror("Error con la incompatibilidad de tipos (relacional).");
 		    	    } else {
 		    	        $$ = T_LOGICO;
 		    	    }
@@ -257,7 +259,7 @@ expresionAditiva    : expresionMultiplicativa { $$ = $1; }
 		        $$ = T_ERROR;
 		        if ($1 != T_ERROR && $3 != T_ERROR) {
 		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
-		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo");
+		    	        yyerror("Error con la incompatibilidad de tipos (Aditiva).");
 		    	    } else {
 		    	        $$ = T_ENTERO;
 		    	    }
@@ -271,7 +273,7 @@ expresionMultiplicativa: expresionUnaria { $$ = $1; }
 		        $$ = T_ERROR;
 		        if ($1 != T_ERROR && $3 != T_ERROR) {
 		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
-		    	        yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    	        yyerror("Error con la incompatibilidad de tipos (Multiplicativa).");
 		    	    } else {
 		    	        $$ = T_ENTERO;
 		    	    }
@@ -297,7 +299,7 @@ expresionUnaria     : expresionSufija { $$ = $1; }
 		    		    $$ = T_LOGICO;
 		    		}
 		    	    } else {
-		    		yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo.");
+		    		yyerror("Error con la incompatibilidad de tipos (Unaria).");
 		    	    }
 		    	}
 		    }
