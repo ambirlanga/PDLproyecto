@@ -36,7 +36,6 @@
 %type<lis> listaParametrosFormales listaCampos
 
 
-%type<cent> instruccionEntradaSalida instruccionSeleccion instruccionIteracion
 
 
 
@@ -103,7 +102,10 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
                     ;
 
 declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
-                    {if(!insTdS($2, FUNCION, $1, 0, -1, $5)){yyerror("Identificador de funcion repetido");}}   
+                    {if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
+                        yyerror("Identificador de funcion repetido");
+                        if(strcmp($2, "main\0")==0){yyerror("El programa tiene mas de un main");}
+                        }}   
                     bloque 
                     { 
                     if(strcmp($2, "main\0")==0) $$=-1; 
@@ -134,14 +136,15 @@ listaParametrosFormales: tipoSimple ID_
         }
                     ;
 			
-bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_ CCOR_
+bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_
         {
           INF inf = obtTdD(-1);
           if (inf.tipo != T_ERROR){ 
                if (inf.tipo != $5){yyerror("Error con la incompatibilidad de tipos en Return");}
           }
-          else{yyerror("El programa tiene mas de un main");}
+          else{yyerror("Error en la declaracion de la funcion");}
         }
+         CCOR_
                     ;
 
 declaracionVariableLocal: 
@@ -164,7 +167,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                         if ($3 != T_ERROR){
                          if(sim.t == T_ERROR) {yyerror("Objeto no declarado");}
                          else if (!(sim.t == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)))
-                            yyerror("Error de tipos en la asignacion");
+                            yyerror("El identificador debe ser de tipo simple");
                         }
                         }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
@@ -197,18 +200,21 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
 instruccionEntradaSalida: READ_ APAR_ ID_ CPAR_ PUNTOYCOMA_
                         {
                             SIMB sim = obtTdS($3);
-                            if(sim.t != T_ENTERO) {$$ = T_ERROR; yyerror("El argumento del read debe ser entero");}
+                            if(sim.t != T_ENTERO) {yyerror("El argumento del read debe ser entero");}
                         }
                     | PRINT_ APAR_ expresion CPAR_ PUNTOYCOMA_
-                        {if($3 != T_ENTERO) {$$ = T_ERROR; yyerror("La expresion del print debe ser entera");}}
+                        {if($3 != T_ENTERO) {yyerror("La expresion del print debe ser entera");}}
                     ;
 
-instruccionSeleccion: IF_ APAR_ expresion CPAR_ instruccion ELSE_ instruccion
-                        {if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("El argumento del if debe ser logica");}}
+instruccionSeleccion: IF_ APAR_ expresion CPAR_ 
+                    {if($3 != T_ERROR && $3 != T_LOGICO) {yyerror("La expresion del if debe ser logica");}}
+                    instruccion ELSE_ instruccion
+                        
                     ;
                 
-instruccionIteracion: WHILE_ APAR_ expresion CPAR_ instruccion 
-{if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("La expresion del while debe ser logica");}}
+instruccionIteracion: WHILE_ APAR_ expresion CPAR_ 
+                    {if($3 != T_ERROR && $3 != T_LOGICO) {yyerror("La expresion del while debe ser logica");}}
+                    instruccion 
                     ;
 
 expresion           : expresionIgualdad {$$ = $1;}
@@ -339,6 +345,7 @@ expresionSufija     : constante { $$ = $1;}
                 INF inf = obtTdD(sim.ref);
                 if (sim.t == T_ERROR) {yyerror("No existe ninguna variable con ese identificador.");}
                 if (inf.tipo == T_ERROR) {yyerror("No existe ninguna funcion con ese identificador.");} 
+                else if (!cmpDom(sim.ref, $3)) {yyerror("Error en el dominio de los parametros actuales");}
                 else {$$ = inf.tipo;}
 		    }
                     ;
