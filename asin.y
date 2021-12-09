@@ -122,10 +122,6 @@ declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametr
                     }
                     ;
 
-
-
-
-
 parametrosFormales  : {$$ = insTdD(-1, T_VACIO);}
                     | listaParametrosFormales {$$ = $1.ref;}
                     ;
@@ -213,11 +209,11 @@ instruccionEntradaSalida: READ_ APAR_ ID_ CPAR_ PUNTOYCOMA_
                     ;
 
 instruccionSeleccion: IF_ APAR_ expresion CPAR_ instruccion ELSE_ instruccion
-                        {if($3 != T_LOGICO) {$$ = T_ERROR; yyerror("IF: Se esperaba una expresion logica");}}
+                        {if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("IF: Se esperaba una expresion logica");}}
                     ;
                 
-instruccionIteracion: WHILE_ APAR_ expresion CPAR_ instruccion
-                        {if($3 != T_LOGICO) {$$ = T_ERROR; yyerror("WHILE: Se esperaba una expresion logica");}}
+instruccionIteracion: WHILE_ APAR_ expresion CPAR_ instruccion 
+{if($3 != T_ERROR && $3 != T_LOGICO) {$$ = T_ERROR; yyerror("WHILE: Se esperaba una expresion logica");}}
                     ;
 
 expresion           : expresionIgualdad {$$ = $1;}
