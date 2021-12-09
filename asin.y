@@ -57,7 +57,7 @@ declaracion	    : declaracionVariable {$$ = 0;}
 declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
             {
                 if(! insTdS($2, VARIABLE, $1, niv, dvar, -1))
-                    yyerror("Identificador repetido");
+                    yyerror("Identificador variable repetido");
                 else 
                     dvar += TALLA_TIPO_SIMPLE;
             }
@@ -67,18 +67,7 @@ declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
                             yyerror("Talla inapropiada del array");
                             numelem = 0;
                          }
-                         // Creamos una referencia en la tabla de arrays para este array
                          int refe = insTdA($1, numelem);
-                         /*Insertamos en la tabla de simbolos 
-                            ($2=ID,
-                             VARIABLE = Codigo en la cabecera de la libreria que nos indica que estamos trantando con una
-                                        variable y no con una funcion, parametro o nulo)
-                             T_ARRAY  = El tipo que sabemos que en este caso es array
-                             niv      = Nivel de anidamiento en el bloque
-                             dvar     = Desplazamiento relativo en el segmento de variables
-                             refe     = Enlace a la tabla de array
-                           Esta funcion en el caso de devolver Falso significaria que el identificador ya existe
-                         */
                          if( !insTdS($2, VARIABLE, T_ARRAY, niv, dvar, refe))
                             yyerror("Identificador variable repetido");
                          else dvar += numelem * TALLA_TIPO_SIMPLE;
@@ -113,15 +102,15 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
             }
                     ;
 
-declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ {$<cent>$=dvar; dvar = 0;}   
+declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
+                    {if(!insTdS($2, FUNCION, $1, 0, -1, $5)){yyerror("Identificador de funcion repetido");}}   
                     bloque 
                     { 
-                    if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
-                        yyerror("Declaracion repetida");
-                    }
-                    if(strcmp($2, "main\0")==0) $$=-1; else $$=0;
+                    if(strcmp($2, "main\0")==0) $$=-1; 
+                    else $$=0;
+
                     if(verTdS) mostrarTdS(); descargaContexto(niv);
-                    niv=0; dvar=$<cent>2;
+                    niv=0;
                     }
                     ;
 
@@ -148,7 +137,10 @@ listaParametrosFormales: tipoSimple ID_
 bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_ CCOR_
         {
           INF inf = obtTdD(-1);
-          if (inf.tipo != T_ERROR || inf.tipo != $5){ yyerror("Error con la incompatibilidad de tipos, no son tipos equivalentes o no son el mismo tipo.");}
+          if (inf.tipo != T_ERROR){ 
+               if (inf.tipo != $5){yyerror("Error con la incompatibilidad de tipos en Return");}
+          }
+          else{yyerror("El programa tiene mas de un main");}
         }
                     ;
 
@@ -172,7 +164,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                         if ($3 != T_ERROR){
                          if(sim.t == T_ERROR) {yyerror("Objeto no declarado");}
                          else if (!(sim.t == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)))
-                            yyerror("El identificador debe ser de tipo simple");
+                            yyerror("Error de tipos en la asignacion");
                         }
                         }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
@@ -184,7 +176,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                             else if($3 != T_ENTERO){yyerror("Indice debe ser de tipo entero");}
                             else{
                                     DIM dim = obtTdA(sim.ref);
-                                    if(!(dim.telem == $6)){ yyerror("El identificador debe ser de tipo simple");} 
+                                    if(!(dim.telem == $6)){ yyerror("Error de tipos en la asignacion");} 
                             }
                         }
                         }
@@ -196,7 +188,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                                 CAMP reg = obtTdR(sim.ref, $3);
                                 if (reg.t == T_ERROR) {yyerror("Campo no declarado");}   
                                 else if (!(reg.t == $5 && ($5 == T_ENTERO || $5 == T_LOGICO)))
-                                    yyerror("El identificador debe ser de tipo simple");
+                                    yyerror("Error de tipos en la asignacion");
                             }
                         }      
                         }
