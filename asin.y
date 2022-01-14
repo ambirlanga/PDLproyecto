@@ -6,6 +6,7 @@
 #include <string.h>
 #include "header.h"
 #include "libtds.h"
+#include "libgci.h"
 %}
 
 %union{
@@ -42,7 +43,7 @@
 
 %%
 
-programa 	    : {dvar=0; niv = 0; cargaContexto(niv);} listaDeclaraciones
+programa 	    : {dvar=0; niv = 0; si=0; cargaContexto(niv);} listaDeclaraciones
             {if($2 == 0){yyerror("el programa no tiene main");} fprintf(stdout,"\n");}
                     ;
     
@@ -75,10 +76,11 @@ declaracionVariable : tipoSimple ID_ PUNTOYCOMA_
                     | STRUCT_ ACOR_ listaCampos CCOR_ ID_ PUNTOYCOMA_
 		    	        {
                          int refe = insTdR($3.ref, $5, T_RECORD, $3.talla);
+                         int tal = $3.talla;
                          if(refe==-1){yyerror("Nombre de struct invalido");}
                          else if( !insTdS($5, VARIABLE, T_RECORD, niv, dvar, refe)){yyerror("Identificador repetido");}
                          else
-                            dvar += TALLA_TIPO_SIMPLE;
+                            dvar +=  tal * TALLA_TIPO_SIMPLE;
                         }
                     ;
 			
@@ -102,12 +104,12 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
             }
                     ;
 
-declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
+declaracionFuncion  : tipoSimple ID_ {$<cent>$=dvar; dvar = 0; niv+=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
                     {$<cent>$=0;
-                        if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
+                    if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
                         yyerror("Identificador de funcion repetido");
                         if(strcmp($2, "main\0")==0){$<cent>$=1;}
-                        }}   
+                    }}   
                     bloque 
                     { 
                     if($<cent>7 ==1) {yyerror("El programa tiene mas de un main");}
@@ -116,7 +118,8 @@ declaracionFuncion  : tipoSimple ID_ {niv=1; cargaContexto(niv);} APAR_ parametr
 
                     if(verTdS) mostrarTdS(); 
                     descargaContexto(niv);
-                    niv=0;
+                    niv -= 1;
+                    dvar= $<cent>3;
                     }
                     ;
 
@@ -154,7 +157,18 @@ bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ 
 declaracionVariableLocal: 
                     | declaracionVariableLocal declaracionVariable
                     ;
+/********************************************************************************************************/  
 
+
+
+
+
+
+
+
+
+
+/********************************************************************************************************/  
 listaInstrucciones  : 
                     | listaInstrucciones instruccion
                     ;
@@ -220,17 +234,37 @@ instruccionIteracion: WHILE_ APAR_ expresion CPAR_
                     {if($3 != T_ERROR && $3 != T_LOGICO) {yyerror("La expresion del while debe ser logica");}}
                     instruccion 
                     ;
+/********************************************************************************************************/  
 
-expresion           : expresionIgualdad {$$ = $1;}
+
+
+
+
+
+
+
+
+/********************************************************************************************************/  
+expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.pos = $1.pos;}
                     | expresion operadorLogico expresionIgualdad
             {
-                $$ = T_ERROR;
-                if ($1 != T_ERROR && $3 != T_ERROR) {
-                    if ($1 == $3 && $1 != T_LOGICO) {
-                        $$ = T_LOGICO;
+                $$.tipo = T_ERROR;
+                if ($1.tipo != T_ERROR && $3.tipo != T_ERROR) {
+                    if ($1.tipo == $3.tipo && $1.tipo != T_LOGICO) {
+                        $$.tipo = T_LOGICO;
                     } else {
                         yyerror("Error con la incompatibilidad de tipos (logica).");
                     }
+                }
+                
+                $$.pos = creaVarTemp();
+                if ($2 == EMULT) {
+                    emite(EMULT, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgPos(niv, $$.pos));
+                } 
+                else {
+                    emite(ESUM, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgPos(niv, $$.pos));
+                    emite(EMENEQ, crArgPos(niv, $$.pos), crArgEnt(1), crArgEtq(si+2));
+                    emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.pos));
                 }
             }
                     ;
@@ -353,45 +387,59 @@ expresionSufija     : constante { $$ = $1;}
                 else {$$ = inf.tipo;}
 		    }
                     ;
-                    
-constante           : CTE_   {$$ = T_ENTERO;}
-                    | TRUE_  {$$ = T_LOGICO;}
-                    | FALSE_ {$$ = T_LOGICO;}
-                    ;
-                    
+/********************************************************************************************************/  
+
+
+
+
+
+
+
+
+/********************************************************************************************************/     
 parametrosActuales  : {$$ = insTdD(-1, T_VACIO);}
                     | listaParametrosActuales {$$ = $1;}
                     ;
                     
-listaParametrosActuales: expresion {$$ = insTdD(-1,$1);}
-                    | expresion COMA_ listaParametrosActuales {$$ = insTdD($3,$1);}
-                    ;
-                    
-                    
-operadorLogico      : OPAND_ { $$ = OP_AND; }
-                    | OPOR_ { $$ = OP_OR; }
-                    ;
-                    
-operadorIgualdad    : OPE_ { $$ = OP_IGUAL; }
-                    | OPNE_ { $$ = OP_NOIGUAL; }
+listaParametrosActuales: expresion 
+                            {$$ = insTdD(-1,$1.tipo);
+                             emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.pos));
+                            }
+                    | expresion {emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.pos));}
+                            COMA_ listaParametrosActuales {$$ = insTdD($3,$1.tipo);}
                     ;
 
-operadorRelacional  : OPMAYOR_ { $$ = OP_MAYOR; }
-                    | OPMENOR_ { $$ = OP_MENOR; }
-                    | OPMI_ { $$ = OP_MAYOROIG; }
-                    | OPMENI_ { $$ = OP_MENOROIG; }
+constante           : CTE_   {$$.tipo = T_ENTERO; $$.pos = $1;}
+                    | TRUE_  {$$.tipo = T_LOGICO; $$.pos = 1;}
+                    | FALSE_ {$$.tipo = T_LOGICO; $$.pos = 0;}
                     ;
                     
-operadorAditivo     : MAS_ { $$ = OP_SUMA; }
-                    | MENOS_ { $$ = OP_RESTA; }
+                    
+operadorLogico      : OPAND_ { $$ = EMULT; }
+                    | OPOR_ { $$ = ESUM; }
+                    ;
+                    
+operadorIgualdad    : OPE_ { $$ = EIGUAL; }
+                    | OPNE_ { $$ = EDIST; }
                     ;
 
-operadorMultiplicativo: POR_ { $$ = OP_MULT; }
-                    | DIV_ { $$ = OP_DIV; }
+operadorRelacional  : OPMAYOR_ { $$ = EMAY; }
+                    | OPMENOR_ { $$ = EMEN; }
+                    | OPMI_ { $$ = EMAYEQ; }
+                    | OPMENI_ { $$ = EMENEQ; }
                     ;
                     
-operadorUnario      : MAS_ { $$ = OP_SUMAUN; }
-                    | MENOS_ { $$ = OP_RESTAUN; }
-                    | OPDISTINTO_ { $$ = OP_NOT; }
+operadorAditivo     : MAS_ { $$ = ESUM; }
+                    | MENOS_ { $$ = EDIF; }
                     ;
+
+operadorMultiplicativo: POR_ { $$ = EMULT; }
+                    | DIV_ { $$ = EDIVI; }
+                    ;
+                    
+operadorUnario      : MAS_ { $$ = ESUM; }
+                    | MENOS_ { $$ = EDIF; }
+                    | OPDISTINTO_ { $$ = ESIG; }
+                    ;
+/********************************************************************************************************/  
 %%
