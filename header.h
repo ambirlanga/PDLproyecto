@@ -46,9 +46,6 @@ typedef struct lis /**************** Estructura para listaParametrosFormales */
 #define OP_NOT 2
 
 /*****************************************************************************/
-/*****************************Variables globales de uso en todo el compilador*/
-extern int si; /* Desplazamiento relativo en el Segmento de codigo*/
-
 /************************************* Variables externas definidas en el AL */
 extern int yylex();
 extern int yyparse();
