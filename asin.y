@@ -219,9 +219,13 @@ instruccionEntradaSalida: READ_ APAR_ ID_ CPAR_ PUNTOYCOMA_
                         {
                             SIMB sim = obtTdS($3);
                             if(sim.t != T_ENTERO) {yyerror("El argumento del read debe ser entero");}
+			    else {emite(EREAD, crArgNul(),crArgNul(),crArgPos(sim.d));}
                         }
                     | PRINT_ APAR_ expresion CPAR_ PUNTOYCOMA_
-                        {if($3 != T_ENTERO) {yyerror("La expresion del print debe ser entera");}}
+                        {
+			if($3 != T_ENTERO) {yyerror("La expresion del print debe ser entera");}
+			else {emite(EWRITE,crArgNul(),crArgNul(),crArgPos($3.d));}
+			}
                     ;
 
 instruccionSeleccion: IF_ APAR_ expresion CPAR_ 
@@ -298,6 +302,9 @@ expresionAditiva    : expresionMultiplicativa { $$ = $1; }
 		    	        yyerror("Error con la incompatibilidad de tipos (Aditiva).");
 		    	    } else {
 		    	        $$ = T_ENTERO;
+				$$.d = creaVarTemp();
+		        	/***************** Expresion a partir de un operador aritmetico */
+		        	emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
 		    	    }
 		        }
 		    }
@@ -312,6 +319,9 @@ expresionMultiplicativa: expresionUnaria { $$ = $1; }
 		    	        yyerror("Error con la incompatibilidad de tipos (Multiplicativa).");
 		    	    } else {
 		    	        $$ = T_ENTERO;
+				$$.d = creaVarTemp();
+		        	/***************** Expresion a partir de un operador aritmetico */
+		        	emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
 		    	    }
 		        }
 		    }
