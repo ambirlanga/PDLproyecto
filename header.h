@@ -46,6 +46,9 @@ typedef struct lis /**************** Estructura para listaParametrosFormales */
 #define OP_NOT 2
 
 /*****************************************************************************/
+/*****************************Variables globales de uso en todo el compilador*/
+extern int si; /* Desplazamiento relativo en el Segmento de codigo*/
+
 /************************************* Variables externas definidas en el AL */
 extern int yylex();
 extern int yyparse();
@@ -65,7 +68,6 @@ extern int verTdS; /* Flag para saber si mostrar la TdS */
 /**************************** Variables externas definidas en las librer´ıas */
 extern int dvar; /* Desplazamiento en el Segmento de Variables */
 extern int niv; /* Nivel de anidamiento "global" o "local" */
-extern int si; /* Desplazamiento relativo en el Segmento de codigo*/
 
 #endif  /* _HEADER_H */
 /*****************************************************************************/
