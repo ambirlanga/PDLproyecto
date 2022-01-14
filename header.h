@@ -65,7 +65,7 @@ extern int verTdS; /* Flag para saber si mostrar la TdS */
 /**************************** Variables externas definidas en las librer´ıas */
 extern int dvar; /* Desplazamiento en el Segmento de Variables */
 extern int niv; /* Nivel de anidamiento "global" o "local" */
-
+extern int si; /* Desplazamiento relativo en el Segmento de codigo*/
 
 #endif  /* _HEADER_H */
 /*****************************************************************************/
