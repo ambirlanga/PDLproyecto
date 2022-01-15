@@ -13,6 +13,8 @@
     int     cent;
     char*   ident;
     ListaP  lis;
+    REFE refe;
+    EXPR expr;
 }
 
 //Todos los simbolos terminales que no necesiten atributos
@@ -32,10 +34,11 @@
 //No terminales con atributos 
 
 %type<cent> declaracionVariable  declaracion declaracionFuncion listaDeclaraciones tipoSimple instruccionAsignacion
-%type<cent> expresion expresionIgualdad expresionRelacional expresionAditiva expresionMultiplicativa expresionUnaria expresionSufija 
-%type<cent> constante operadorLogico operadorIgualdad operadorRelacional operadorAditivo operadorMultiplicativo operadorUnario
+%type<cent> operadorLogico operadorIgualdad operadorRelacional operadorAditivo operadorMultiplicativo operadorUnario
 %type<cent> parametrosFormales parametrosActuales listaParametrosActuales 
 %type<lis> listaParametrosFormales listaCampos
+%type <expr> constante expresion expresionIgualdad expresionRelacional expresionAditiva expresionMultiplicativa expresionUnaria expresionSufija 
+
 
 
 
@@ -43,20 +46,20 @@
 
 %%
 
-programa 	    : {	dvar=0; niv = 0; si=0; cargaContexto(niv);
-			$<aux>$.ref1 = creaLans(si);
-			emite(INCTOP, crArgNul(), crArgNul(), crArgEnt(-1));
-			$<aux>$.ref2 = creaLans(si);
-			emite(GOTOS, crArgNul(), crArgNul(), crArgEtq(-1);
-		      } listaDeclaraciones
-                      {	if($2 == 0){yyerror("el programa no tiene main");} fprintf(stdout,"\n");
-			completaLans($<aux>1.ref1, crArgEnt(dvar));
+programa 	    : {dvar=0; niv = 0; si=0; cargaContexto(niv);
+                $<refe>$.ref1 = creaLans(si);
+                emite(INCTOP, crArgNul(), crArgNul(), crArgEnt(-1));
+                $<refe>$.ref2 = creaLans(si);
+                lMain=$<refe>$.ref2;
+                emite(GOTOS, crArgNul(), crArgNul(), crArgEnt(-1));}
 
-			SIMB sim = obtTdS("main");
-			$<aux>$.ref3 = sim.d;
+            listaDeclaraciones
 
-			completaLans($<aux>1.ref2, crArgEtq($<aux>$.ref3));
-		      }
+
+                {if($2 == 0){yyerror("el programa no tiene main");} 
+                completaLans($<refe>1.ref1, crArgEnt(dvar));
+            }
+            
                     ;
     
 listaDeclaraciones  : declaracion {$$ = $1;}
@@ -116,17 +119,19 @@ listaCampos	    : tipoSimple ID_ PUNTOYCOMA_
             }
                     ;
 
-declaracionFuncion  : tipoSimple ID_ {$<cent>$=dvar; dvar = 0; niv+=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
+declaracionFuncion  : tipoSimple ID_ {$<cent>$=dvar; dvar = 0; niv=1; cargaContexto(niv);} APAR_ parametrosFormales CPAR_ 
                     {$<cent>$=0;
-                    if(!insTdS($2, FUNCION, $1, 0, -1, $5)){
-                        yyerror("Identificador de funcion repetido");
-                        if(strcmp($2, "main\0")==0){$<cent>$=1;}
-                    }}   
+                    if(!insTdS($2, FUNCION, $1, 0, -1, $5)){yyerror("Identificador de funcion repetido");
+                        if(strcmp($2, "main\0")==0){$<cent>$=1;}}
+                    if(strcmp("main",$2)==0 && $<cent>$==0){
+                        completaLans(lMain,crArgEtq(si));
+                    }
+                    }
                     bloque 
                     { 
                     if($<cent>7 ==1) {yyerror("El programa tiene mas de un main");}
-                    if(strcmp($2, "main\0")==0) $$=-1; 
-                    else $$=0;
+                    if (strcmp($2,"main") == 0) {$$ = 1;}
+                    else {$$ = 0;}
 
                     if(verTdS) mostrarTdS(); 
                     descargaContexto(niv);
@@ -155,13 +160,28 @@ listaParametrosFormales: tipoSimple ID_
         }
                     ;
 			
-bloque              : ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_
+bloque          : 
+        {
+            emite(PUSHFP, crArgNul(), crArgNul(), crArgNul());
+            emite(FPTOP, crArgNul(), crArgNul(), crArgNul());
+            $<cent>$ = creaLans(si);
+            emite(INCTOP, crArgNul(), crArgNul(), crArgEnt(-1));
+        } 
+        ACOR_ declaracionVariableLocal listaInstrucciones RETURN_ expresion PUNTOYCOMA_
         {
           INF inf = obtTdD(-1);
           if (inf.tipo != T_ERROR){ 
-               if (inf.tipo != $5){yyerror("Error con la incompatibilidad de tipos en Return");}
+               if (inf.tipo != $6.tipo){yyerror("Error con la incompatibilidad de tipos en Return");}
           }
           else{yyerror("Error en la declaracion de la funcion");}
+
+          int dir_ret = TALLA_SEGENLACES + inf.tsp + TALLA_TIPO_SIMPLE;
+          completaLans($<cent>1, crArgEnt(dvar)); 
+          emite(EASIG, crArgPos(niv, $6.d), crArgNul(), crArgPos(niv, -dir_ret));
+          emite(TOPFP, crArgNul(), crArgNul(), crArgNul());
+          emite(FPPOP, crArgNul(), crArgNul(), crArgNul());
+          if (strcmp(inf.nom,"main") == 0) { emite(FIN, crArgNul(), crArgNul(), crArgNul()); }
+          else { emite(RET, crArgNul(), crArgNul(), crArgNul());}
         }
          CCOR_
                     ;
@@ -193,39 +213,45 @@ instruccion         : ACOR_ listaInstrucciones CCOR_
                     ;
                     
 instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
-                        {SIMB sim = obtTdS($1);
-                        if ($3 != T_ERROR){
+                        {
+                        SIMB sim = obtTdS($1);
+                        if ($3.tipo != T_ERROR){
                          if(sim.t == T_ERROR) {yyerror("Objeto no declarado");}
-                         else if (!(sim.t == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)))
+                         else if (!(sim.t == $3.tipo && ($3.tipo == T_ENTERO || $3.tipo == T_LOGICO)))
                             yyerror("El identificador debe ser de tipo simple");
                         }
-			emite(EASIG, crArgPos(niv, $3.pos), crArgNul(), crArgPos(sim.n, sim.d));
+                        emite(EASIG, crArgPos(niv, $3.d), crArgNul(), crArgPos(sim.n, sim.d));
                         }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
-                        {SIMB sim = obtTdS($1);
-                        if ($3 != T_ERROR && $6 != T_ERROR)
+                        {
+                        SIMB sim = obtTdS($1);
+                        if ($3.tipo != T_ERROR && $6.tipo != T_ERROR)
                         {
                             if(sim.t == T_ERROR) {yyerror("Objeto no declarado");}
                             else if(sim.t != T_ARRAY){yyerror("El identificador debe ser de tipo array");}
-                            else if($3 != T_ENTERO){yyerror("Indice debe ser de tipo entero");}
+                            else if($3.tipo != T_ENTERO){yyerror("Indice debe ser de tipo entero");}
                             else{
                                     DIM dim = obtTdA(sim.ref);
-                                    if(!(dim.telem == $6)){ yyerror("Error de tipos en la asignacion");} 
+                                    if(!(dim.telem == $6.tipo)){ yyerror("Error de tipos en la asignacion");} 
                             }
                         }
-			emite(EVA, crArgPos(sim.n, sim.d), crArgPos(niv, $3.pos), crArgPos(niv, $6.pos));
+                        emite(EVA, crArgPos(sim.n, sim.d), crArgPos(niv, $3.d), crArgPos(niv, $6.d)); 
                         }
                     | ID_ PUNTO_ ID_ IGUAL_ expresion PUNTOYCOMA_
-                        {SIMB sim = obtTdS($1);
-                        if ($5 != T_ERROR){
+                        {
+                        SIMB sim = obtTdS($1);
+                        if ($5.tipo != T_ERROR){
                             if (sim.t != T_RECORD) {yyerror("El identificador debe ser struct");}   
                             else if (sim.t != T_ERROR){
                                 CAMP reg = obtTdR(sim.ref, $3);
                                 if (reg.t == T_ERROR) {yyerror("Campo no declarado");}   
-                                else if (!(reg.t == $5 && ($5 == T_ENTERO || $5 == T_LOGICO)))
+                                else if (!(reg.t == $5.tipo && ($5.tipo == T_ENTERO || $5.tipo == T_LOGICO)))
                                     yyerror("Error de tipos en la asignacion");
+                                else{
+                                    emite(EVA, crArgPos(sim.n, sim.d), crArgPos(niv, reg.d), crArgPos(niv, $5.d));
+                                }   // REVISAR
                             }
-                        }      
+                        } 
                         }
                     ;
 
@@ -233,24 +259,44 @@ instruccionEntradaSalida: READ_ APAR_ ID_ CPAR_ PUNTOYCOMA_
                         {
                             SIMB sim = obtTdS($3);
                             if(sim.t != T_ENTERO) {yyerror("El argumento del read debe ser entero");}
-			    else {emite(EREAD, crArgNul(),crArgNul(),crArgPos(sim.d));}
+                            emite(EREAD, crArgNul(), crArgNul(), crArgPos(sim.n, sim.d));
                         }
                     | PRINT_ APAR_ expresion CPAR_ PUNTOYCOMA_
-                        {
-			if($3 != T_ENTERO) {yyerror("La expresion del print debe ser entera");}
-			else {emite(EWRITE,crArgNul(),crArgNul(),crArgPos($3.d));}
-			}
+                        {if($3.tipo != T_ENTERO) {yyerror("La expresion del print debe ser entera");}
+                        emite(EWRITE, crArgNul(), crArgNul(), crArgPos(niv, $3.d));
+                        }
                     ;
 
 instruccionSeleccion: IF_ APAR_ expresion CPAR_ 
-                    {if($3 != T_ERROR && $3 != T_LOGICO) {yyerror("La expresion del if debe ser logica");}}
-                    instruccion ELSE_ instruccion
-                        
+                    {
+                    if($3.tipo != T_ERROR && $3.tipo != T_LOGICO) {yyerror("La expresion del if debe ser logica");}
+                    $<cent>$ = creaLans(si);
+                    emite(EIGUAL, crArgPos(niv, $3.d), crArgEnt(0), crArgEtq(-1));
+                    }
+                    instruccion
+                    {
+                    $<cent>$ = creaLans(si);
+                    emite(GOTOS, crArgNul(), crArgNul(), crArgEtq(-1));
+                    completaLans($<cent>5, crArgEtq(si));
+                    }
+                    ELSE_ instruccion {completaLans($<cent>7, crArgEtq(si));}            
                     ;
                 
 instruccionIteracion: WHILE_ APAR_ expresion CPAR_ 
-                    {if($3 != T_ERROR && $3 != T_LOGICO) {yyerror("La expresion del while debe ser logica");}}
+                    {
+                    if($3.tipo != T_ERROR && $3.tipo != T_LOGICO) {yyerror("La expresion del while debe ser logica");}
+                    
+                    $<refe>$.ref1 = creaLans(si);   // REVISAR
+                    emite(EIGUAL, crArgPos(niv, $3.d), crArgEnt(1), crArgEtq(-1) );
+                    $<refe>$.ref2 = creaLans(si);                              
+                    emite(GOTOS, crArgNul(), crArgNul(), crArgEtq(-1));
+                    $<refe>$.ref3 = si;  
+                    }
                     instruccion 
+                    {
+                    emite(GOTOS, crArgNul(), crArgNul(), crArgEtq($<refe>5.ref3));
+                    completaLans($<refe>5.ref2, crArgEnt(si));
+                    }
                     ;
 /********************************************************************************************************/  
 
@@ -263,7 +309,7 @@ instruccionIteracion: WHILE_ APAR_ expresion CPAR_
 
 
 /********************************************************************************************************/  
-expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.pos = $1.pos;}
+expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.d = $1.d;}
                     | expresion operadorLogico expresionIgualdad
             {
                 $$.tipo = T_ERROR;
@@ -275,148 +321,169 @@ expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.pos = $1.pos;}
                     }
                 }
                 
-                $$.pos = creaVarTemp();
+                $$.d = creaVarTemp();
                 if ($2 == EMULT) {
-                    emite(EMULT, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgPos(niv, $$.pos));
+                    emite(EMULT, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
                 } 
                 else {
-                    emite(ESUM, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgPos(niv, $$.pos));
-                    emite(EMENEQ, crArgPos(niv, $$.pos), crArgEnt(1), crArgEtq(si+2));
-                    emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.pos));
+                    emite(ESUM, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
+                    emite(EMENEQ, crArgPos(niv, $$.d), crArgEnt(1), crArgEtq(si+2));
+                    emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.d));
                 }
             }
                     ;
                     
-expresionIgualdad   : expresionRelacional {$$ = $1; $$.pos = $1.pos;}
+expresionIgualdad   : expresionRelacional {$$.tipo = $1.tipo; $$.d = $1.d;}
                     | expresionIgualdad operadorIgualdad expresionRelacional
-                        {if ($1 == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)) {$$ = T_LOGICO;}
-                         else{$$ = T_ERROR; yyerror("Error con la incompatibilidad de tipos (igualdad).");}
-			 
-			 $$.pos = creaVarTemp();
-			 emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.pos));
-			 emite($2, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgEtq(si + 2));
-			 emite(EASIG, crArgEnt(0), crArgNul(), crArgPos(niv, $$.pos));
-			}
+                        {
+                        if ($1.tipo == $3.tipo && ($3.tipo == T_ENTERO || $3.tipo == T_LOGICO)) {$$.tipo = T_LOGICO;}
+                        else{$$.tipo = T_ERROR; yyerror("Error con la incompatibilidad de tipos (igualdad).");}
+                         
+                        $$.d = creaVarTemp();
+                        emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.d));
+                        emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgEtq(si + 2));
+                        emite(EASIG, crArgEnt(0), crArgNul(), crArgPos(niv, $$.d));
+                        }
                     ;
                     
-expresionRelacional : expresionAditiva { $$ = $1;}
+expresionRelacional : expresionAditiva {$$.tipo = $1.tipo; $$.d = $1.d;}
                     | expresionRelacional operadorRelacional expresionAditiva
 		    {
-		        $$ = T_ERROR;
-		        if ($1 != T_ERROR && $3 != T_ERROR) {
-		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
+		        $$.tipo = T_ERROR;
+		        if ($1.tipo != T_ERROR && $3.tipo != T_ERROR) {
+		    	    if (!($1.tipo == $3.tipo && $1.tipo == T_ENTERO)) {
 		    	        yyerror("Error con la incompatibilidad de tipos (relacional).");
 		    	    } else {
-		    	        $$ = T_LOGICO;
+		    	        $$.tipo = T_LOGICO;
 		    	    }
 		        }
+                $$.d = creaVarTemp();
+                emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.d));
+                emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgEtq(si+2));
+                emite(EASIG, crArgEnt(0), crArgNul(), crArgPos(niv, $$.d));
 		    }
                     ;
                     
-expresionAditiva    : expresionMultiplicativa { $$ = $1; }
+expresionAditiva    : expresionMultiplicativa {$$.tipo = $1.tipo; $$.d = $1.d;}
                     | expresionAditiva operadorAditivo expresionMultiplicativa
 		    {
-		        $$ = T_ERROR;
-		        if ($1 != T_ERROR && $3 != T_ERROR) {
-		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
+		        $$.tipo = T_ERROR;
+		        if ($1.tipo != T_ERROR && $3.tipo != T_ERROR) {
+		    	    if (!($1.tipo == $3.tipo && $1.tipo == T_ENTERO)) {
 		    	        yyerror("Error con la incompatibilidad de tipos (Aditiva).");
 		    	    } else {
-		    	        $$ = T_ENTERO;
-				$$.d = creaVarTemp();
-		        	/***************** Expresion a partir de un operador aritmetico */
-		        	emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
+		    	        $$.tipo = T_ENTERO;
+                        $$.d = creaVarTemp();
+                        emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
 		    	    }
 		        }
 		    }
                     ;
                     
-expresionMultiplicativa: expresionUnaria { $$ = $1; }
+expresionMultiplicativa: expresionUnaria {$$.tipo = $1.tipo; $$.d = $1.d; }
                     | expresionMultiplicativa operadorMultiplicativo expresionUnaria
 		    {
-		        $$ = T_ERROR;
-		        if ($1 != T_ERROR && $3 != T_ERROR) {
-		    	    if (!($1 == $3 && $1 == T_ENTERO)) {
+		        $$.tipo = T_ERROR;
+		        if ($1.tipo != T_ERROR && $3.tipo != T_ERROR) {
+		    	    if (!($1.tipo == $3.tipo && $1.tipo == T_ENTERO)) {
 		    	        yyerror("Error con la incompatibilidad de tipos (Multiplicativa).");
 		    	    } else {
-		    	        $$ = T_ENTERO;
-				$$.d = creaVarTemp();
-		        	/***************** Expresion a partir de un operador aritmetico */
-		        	emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
+		    	        $$.tipo = T_ENTERO;
+                        $$.d = creaVarTemp();
+                        emite($2, crArgPos(niv, $1.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));
 		    	    }
 		        }
 		    }
                     ;
                     
-expresionUnaria     : expresionSufija { $$ = $1; }
+expresionUnaria     : expresionSufija {$$.tipo = $1.tipo; $$.d = $1.d; }
                     | operadorUnario expresionUnaria
 		    {
-		    	$$ = T_ERROR;
-		    	if ($2 != T_ERROR) {
-		    	    if ($2 == T_ENTERO) {
-		    		if ($1 == OP_NOT) {
+		    	$$.tipo = T_ERROR;
+		    	if ($2.tipo != T_ERROR) {
+		    	    if ($2.tipo == T_ENTERO) {
+		    		if ($1 == ESIG) {
 		    		    yyerror("Error con la incompatibilidad de tipos, no se puede negar un entero.");
 		    		} else {
-		    		    $$ = T_ENTERO;
+		    		    $$.tipo = T_ENTERO;
 		    		}
-		    	    } else if ($2 == T_LOGICO) {
-		    		if ($1 == OP_SUMAUN || $1 == OP_RESTAUN) {
+		    	    } else if ($2.tipo == T_LOGICO) {
+		    		if ($1 == ESUM || $1 == EDIF) {
 		    		    yyerror("Error con la incompatibilidad de tipos, solo se puede aplicar el operador unario '+' o '-' a una expresión entera.");
 		    		} else {
-		    		    $$ = T_LOGICO;
+		    		    $$.tipo = T_LOGICO;
 		    		}
 		    	    } else {
 		    		yyerror("Error con la incompatibilidad de tipos (Unaria).");
 		    	    }
 		    	}
+
+                $$.d = creaVarTemp();
+                if ($1 == ESIG) {emite(EDIF, crArgEnt(1), crArgPos(niv, $2.d), crArgPos(niv, $$.d));}
+                else {emite($1, crArgEnt(0), crArgPos(niv, $2.d), crArgPos(niv, $$.d));}
 		    }
                     ;
 
-expresionSufija     : constante { $$ = $1;}
-                    | APAR_ expresion CPAR_ { $$ = $2; }
+expresionSufija     : constante {$$.tipo = $1.tipo; $$.d = creaVarTemp(); emite(EASIG, crArgEnt($1.d), crArgNul(), crArgPos(niv, $$.d)); }
+                    | APAR_ expresion CPAR_ {$$.tipo = $2.tipo; $$.d = $2.d; }
                     | ID_
             {   
-                $$ = T_ERROR;
+                $$.tipo = T_ERROR;
                 SIMB sim = obtTdS($1);
-                if (sim.t != T_ERROR) {$$ = sim.t;}   
+                if (sim.t != T_ERROR) {$$.tipo = sim.t;}   
                 else {yyerror("Variable mal declarada"); }
+
+                $$.d = creaVarTemp();
+                emite(EASIG, crArgPos(sim.n, sim.d), crArgNul(), crArgPos(niv, $$.d));
             }
                     | ID_ PUNTO_ ID_
             {   
-                $$ = T_ERROR;
+                $$.tipo = T_ERROR;
                 SIMB sim = obtTdS($1);
                 if (sim.t != T_RECORD) {yyerror("El identificador debe ser struct");}   
                 else if(sim.t != T_ERROR){
                     CAMP reg = obtTdR(sim.ref, $3);
-                    if (reg.t != T_ERROR) {$$ = reg.t;}   
-                    else {yyerror("Campo no declarado"); }
-                }
+                    if (reg.t == T_ERROR) {yyerror("Campo no declarado");}   
+                    else{ 
+                        $$.tipo  = reg.t;
+                        $$.d = creaVarTemp();
+                        emite(EAV, crArgPos(sim.n, sim.d), crArgPos(niv, reg.d), crArgPos(niv, $$.d));  // REVISAR
+                    }
+                }                
             }
                     | ID_ ABRA_ expresion CBRA_
             {       
-                $$ = T_ERROR;
+                $$.tipo = T_ERROR;
                 SIMB sim = obtTdS($1);         
                 if (sim.t == T_ERROR) {yyerror("Variable no declarada");}
                 else if (sim.t != T_ARRAY) {yyerror("Se esperaba un tipo Array");}
                 else{
-                    if ($3 != T_ENTERO) {yyerror("VECTOR: La variable con la que se accede ha de ser un entero");}                             
+                    if ($3.tipo != T_ENTERO) {yyerror("VECTOR: La variable con la que se accede ha de ser un entero");}                             
                     else {
                         DIM dim = obtTdA(sim.ref);
-				        $$ = dim.telem;
+				        $$.tipo = dim.telem;
                     }
-                }                              
+                } 
+                $$.d = creaVarTemp();
+                emite(EAV, crArgPos(sim.n, sim.d), crArgPos(niv, $3.d), crArgPos(niv, $$.d));                             
             }
-                    | ID_ APAR_ parametrosActuales CPAR_
+                    | ID_ {emite(EPUSH, crArgNul(), crArgNul(), crArgEnt(TALLA_TIPO_SIMPLE));} APAR_ parametrosActuales CPAR_
             {
                 
-                $$ = T_ERROR;
+                $$.tipo  = T_ERROR;
                 SIMB sim = obtTdS($1);
                 INF inf = obtTdD(sim.ref);
                 if (sim.t == T_ERROR) {yyerror("No existe ninguna variable con ese identificador.");}
                 if (inf.tipo == T_ERROR) {yyerror("No existe ninguna funcion con ese identificador.");} 
-                else if (!cmpDom(sim.ref, $3)) {yyerror("Error en el dominio de los parametros actuales");}
-                else {$$ = inf.tipo;}
+                else if (!cmpDom(sim.ref, $4)) {yyerror("Error en el dominio de los parametros actuales");}
+                else {$$.tipo = inf.tipo;}
+
+                emite(CALL, crArgNul(), crArgNul(), crArgEtq(sim.d)); 
+                emite(DECTOP, crArgNul(), crArgNul(), crArgEnt(inf.tsp)); 
+                $$.d = creaVarTemp();
+                emite(EPOP, crArgNul(), crArgNul(), crArgPos(niv, $$.d));
 		    }
-                    ;
+            ;
 /********************************************************************************************************/  
 
 
@@ -433,15 +500,15 @@ parametrosActuales  : {$$ = insTdD(-1, T_VACIO);}
                     
 listaParametrosActuales: expresion 
                             {$$ = insTdD(-1,$1.tipo);
-                             emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.pos));
+                             emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.d));
                             }
-                    | expresion {emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.pos));}
-                            COMA_ listaParametrosActuales {$$ = insTdD($3,$1.tipo);}
+                    | expresion {emite(EPUSH,crArgNul(),crArgNul(),crArgPos(niv, $1.d));}
+                      COMA_ listaParametrosActuales {$$ = insTdD($4,$1.tipo);}
                     ;
 
-constante           : CTE_   {$$.tipo = T_ENTERO; $$.pos = $1;}
-                    | TRUE_  {$$.tipo = T_LOGICO; $$.pos = 1;}
-                    | FALSE_ {$$.tipo = T_LOGICO; $$.pos = 0;}
+constante           : CTE_   {$$.tipo = T_ENTERO; $$.d = $1;}
+                    | TRUE_  {$$.tipo = T_LOGICO; $$.d = 1;}
+                    | FALSE_ {$$.tipo = T_LOGICO; $$.d = 0;}
                     ;
                     
                     

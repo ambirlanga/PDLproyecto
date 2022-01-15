@@ -6,12 +6,24 @@
 #ifndef _HEADER_H
 #define _HEADER_H
 
-typedef struct lis /**************** Estructura para listaParametrosFormales */
+typedef struct lis /********************************* Estructura para listas */
 {              
   int talla;        
   int ref;         
 }ListaP;
 
+typedef struct refe {
+	int ref1;
+	int ref2;
+	int ref3;
+} REFE;
+
+typedef struct expr { /*************************** Estructura para expresiones */
+	int tipo;
+	int d;
+} EXPR;
+
+int lMain;
 
 /***************************************************** Constantes Simbolicas */
 #define TALLA_TIPO_SIMPLE 1 /* Talla asociada a los tipos simples */
@@ -46,8 +58,6 @@ typedef struct lis /**************** Estructura para listaParametrosFormales */
 #define OP_NOT 2
 
 /*****************************************************************************/
-/***************************** Variables externas definidas en las librerias*/
-extern int si;            /* Desplazamiento relativo en el segmento de código*/
 /************************************* Variables externas definidas en el AL */
 extern int yylex();
 extern int yyparse();
@@ -68,5 +78,6 @@ extern int verTdS; /* Flag para saber si mostrar la TdS */
 extern int dvar; /* Desplazamiento en el Segmento de Variables */
 extern int niv; /* Nivel de anidamiento "global" o "local" */
 
+extern int si; /* Desplazamiento relativo en el Segmento de codigo*/
 #endif  /* _HEADER_H */
 /*****************************************************************************/
