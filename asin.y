@@ -43,8 +43,20 @@
 
 %%
 
-programa 	    : {dvar=0; niv = 0; si=0; cargaContexto(niv);} listaDeclaraciones
-            {if($2 == 0){yyerror("el programa no tiene main");} fprintf(stdout,"\n");}
+programa 	    : {	dvar=0; niv = 0; si=0; cargaContexto(niv);
+			$<aux>$.ref1 = creaLans(si);
+			emite(INCTOP, crArgNul(), crArgNul(), crArgEnt(-1));
+			$<aux>$.ref2 = creaLans(si);
+			emite(GOTOS, crArgNul(), crArgNul(), crArgEtq(-1);
+		      } listaDeclaraciones
+                      {	if($2 == 0){yyerror("el programa no tiene main");} fprintf(stdout,"\n");
+			completaLans($<aux>1.ref1, crArgEnt(dvar));
+
+			SIMB sim = obtTdS("main");
+			$<aux>$.ref3 = sim.d;
+
+			completaLans($<aux>1.ref2, crArgEtq($<aux>$.ref3));
+		      }
                     ;
     
 listaDeclaraciones  : declaracion {$$ = $1;}
@@ -187,6 +199,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                          else if (!(sim.t == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)))
                             yyerror("El identificador debe ser de tipo simple");
                         }
+			emite(EASIG, crArgPos(niv, $3.pos), crArgNul(), crArgPos(sim.n, sim.d));
                         }
                     | ID_ ABRA_ expresion CBRA_ IGUAL_ expresion PUNTOYCOMA_
                         {SIMB sim = obtTdS($1);
@@ -200,6 +213,7 @@ instruccionAsignacion: ID_ IGUAL_ expresion PUNTOYCOMA_
                                     if(!(dim.telem == $6)){ yyerror("Error de tipos en la asignacion");} 
                             }
                         }
+			emite(EVA, crArgPos(sim.n, sim.d), crArgPos(niv, $3.pos), crArgPos(niv, $6.pos));
                         }
                     | ID_ PUNTO_ ID_ IGUAL_ expresion PUNTOYCOMA_
                         {SIMB sim = obtTdS($1);
@@ -273,10 +287,16 @@ expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.pos = $1.pos;}
             }
                     ;
                     
-expresionIgualdad   : expresionRelacional {$$ = $1;}
+expresionIgualdad   : expresionRelacional {$$ = $1; $$.pos = $1.pos;}
                     | expresionIgualdad operadorIgualdad expresionRelacional
                         {if ($1 == $3 && ($3 == T_ENTERO || $3 == T_LOGICO)) {$$ = T_LOGICO;}
-                         else{$$ = T_ERROR; yyerror("Error con la incompatibilidad de tipos (igualdad).");}}
+                         else{$$ = T_ERROR; yyerror("Error con la incompatibilidad de tipos (igualdad).");}
+			 
+			 $$.pos = creaVarTemp();
+			 emite(EASIG, crArgEnt(1), crArgNul(), crArgPos(niv, $$.pos));
+			 emite($2, crArgPos(niv, $1.pos), crArgPos(niv, $3.pos), crArgEtq(si + 2));
+			 emite(EASIG, crArgEnt(0), crArgNul(), crArgPos(niv, $$.pos));
+			}
                     ;
                     
 expresionRelacional : expresionAditiva { $$ = $1;}
