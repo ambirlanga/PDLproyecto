@@ -8,7 +8,7 @@
 #include "libtds.h"
 #include "libgci.h"
 %}
-
+ 
 %union{
     int     cent;
     char*   ident;
