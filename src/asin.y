@@ -314,7 +314,7 @@ expresion           : expresionIgualdad {$$.tipo = $1.tipo; $$.d = $1.d;}
             {
                 $$.tipo = T_ERROR;
                 if ($1.tipo != T_ERROR && $3.tipo != T_ERROR) {
-                    if ($1.tipo == $3.tipo && $1.tipo != T_LOGICO) {
+                    if ($1.tipo == $3.tipo && $1.tipo == T_LOGICO) {
                         $$.tipo = T_LOGICO;
                     } else {
                         yyerror("Error con la incompatibilidad de tipos (logica).");
